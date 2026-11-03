@@ -1,0 +1,26 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Techem tenant portal",
+        "description": "Log in at mieter.techem.de, open the browser's developer tools → Storage/Application → Cookies → mieter.techem.de and copy the value of `__Secure-next-auth.session-token` (or paste the whole Cookie header).",
+        "data": { "cookie": "Session cookie" }
+      },
+      "reauth_confirm": {
+        "title": "Techem session expired",
+        "description": "Log in at mieter.techem.de again and paste a fresh `__Secure-next-auth.session-token` cookie.",
+        "data": { "cookie": "Session cookie" }
+      }
+    },
+    "error": {
+      "bad_cookie": "No session cookie found in the pasted text.",
+      "invalid_auth": "The portal rejected this cookie (expired or logged out).",
+      "cannot_connect": "Could not reach or read the Techem portal."
+    },
+    "abort": {
+      "already_configured": "This Techem account is already configured.",
+      "reauth_successful": "Session renewed.",
+      "unique_id_mismatch": "This cookie belongs to a different Techem account."
+    }
+  }
+}

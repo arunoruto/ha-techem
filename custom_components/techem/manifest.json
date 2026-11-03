@@ -1,0 +1,13 @@
+{
+  "domain": "techem",
+  "name": "Techem",
+  "codeowners": ["@arunoruto"],
+  "config_flow": true,
+  "dependencies": ["recorder"],
+  "documentation": "https://github.com/arunoruto/ha-techem",
+  "issue_tracker": "https://github.com/arunoruto/ha-techem/issues",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "requirements": [],
+  "version": "0.1.0"
+}
