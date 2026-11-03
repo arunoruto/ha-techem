@@ -23,6 +23,7 @@
 > [!NOTE]
 > **Unofficial.** Not affiliated with Techem. The portal has no public API, so this reads
 > the same pages your browser does. It may break whenever Techem changes the portal.
+> The integration's icon is an original design, not the Techem logo.
 
 <details>
   <summary>Table of Contents</summary>
