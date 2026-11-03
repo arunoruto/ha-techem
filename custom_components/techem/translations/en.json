@@ -4,12 +4,16 @@
       "user": {
         "title": "Techem tenant portal",
         "description": "Log in at mieter.techem.de, open the browser's developer tools → Storage/Application → Cookies → mieter.techem.de and copy the value of `__Secure-next-auth.session-token` (or paste the whole Cookie header).",
-        "data": { "cookie": "Session cookie" }
+        "data": {
+          "cookie": "Session cookie"
+        }
       },
       "reauth_confirm": {
         "title": "Techem session expired",
         "description": "Log in at mieter.techem.de again and paste a fresh `__Secure-next-auth.session-token` cookie.",
-        "data": { "cookie": "Session cookie" }
+        "data": {
+          "cookie": "Session cookie"
+        }
       }
     },
     "error": {
@@ -21,6 +25,18 @@
       "already_configured": "This Techem account is already configured.",
       "reauth_successful": "Session renewed.",
       "unique_id_mismatch": "This cookie belongs to a different Techem account."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Heating model",
+        "description": "The model spreads each monthly Techem value over the hours of the month and forecasts the current month. Weather (outdoor temperature and solar radiation) comes from Open-Meteo; only your home coordinates rounded to ~10 km are sent. Radiator valve sensors (position in %) make the hourly split follow when your radiators were actually open; they need long-term statistics (state_class: measurement).",
+        "data": {
+          "weather": "Use Open-Meteo weather (needed for the model and forecast)",
+          "valves": "Radiator valve position sensors (optional)"
+        }
+      }
     }
   }
 }

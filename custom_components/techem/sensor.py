@@ -6,13 +6,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
-from homeassistant.const import UnitOfEnergy, UnitOfVolume
+from homeassistant.const import EntityCategory, UnitOfEnergy, UnitOfVolume
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import TechemConfigEntry
+from .analysis import Analysis
 from .api import ServiceData
 from .const import BASE_URL, DOMAIN
 from .coordinator import TechemCoordinator, short_id
@@ -91,14 +92,62 @@ def kinds(service: str, svc: ServiceData) -> list[Kind]:
     return out
 
 
+@dataclass(frozen=True)
+class ModelKind:
+    key: str
+    name: str
+    unit: str | None
+    value: Callable[[Analysis], float | None]
+    attrs: Callable[[Analysis], dict]
+    diagnostic: bool = False
+
+
+def _fit_attrs(a: Analysis) -> dict:
+    f = a.fit
+    if not f:
+        return {}
+    return {
+        "balance_temperature": f.base,
+        "kwh_per_degree_day": round(f.a_hdd, 3),
+        "kwh_per_kwh_m2_sun": round(f.a_sun, 3),
+        "r2": round(f.r2, 3),
+        "rmse_loo_kwh": round(f.rmse_loo, 1),
+        "months_fitted": f.months,
+    }
+
+
+MODEL_KINDS = [
+    ModelKind(
+        "forecast_this_month", "Heating forecast this month", "KWH", lambda a: a.forecast,
+        lambda a: {
+            "month": a.month, "so_far": a.so_far, "behaviour_factor": a.factor.value,
+            "hours_from_weather_forecast": a.forecast_from_forecast_h,
+            "hours_from_past_years": a.forecast_from_climate_h,
+        },
+    ),
+    ModelKind("this_month_so_far", "Heating this month so far", "KWH", lambda a: a.so_far, lambda a: {"month": a.month}),
+    ModelKind(
+        "behaviour_factor", "Heating behaviour factor", None, lambda a: a.factor.value,
+        lambda a: {"months": a.factor.months, "actual_kwh": a.factor.actual, "weather_model_kwh": a.factor.model, **_fit_attrs(a)},
+        diagnostic=True,
+    ),
+    ModelKind(
+        "last_month_vs_weather", "Heating last month vs weather", "%",
+        lambda a: a.last_month_ratio and round(a.last_month_ratio * 100, 1), lambda a: {"period": a.last_month},
+    ),
+]  # fmt: skip
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: TechemConfigEntry, add: AddConfigEntryEntitiesCallback) -> None:
     coordinator = entry.runtime_data
-    add(
+    entities: list[SensorEntity] = [
         TechemSensor(coordinator, unit, service, kind)
         for unit, services in coordinator.data.items()
         for service, svc in services.items()
         for kind in kinds(service, svc)
-    )
+    ]
+    entities += [TechemModelSensor(coordinator, unit, kind) for unit in coordinator.analyses for kind in MODEL_KINDS]
+    add(entities)
 
 
 class TechemSensor(CoordinatorEntity[TechemCoordinator], SensorEntity):
@@ -139,3 +188,42 @@ class TechemSensor(CoordinatorEntity[TechemCoordinator], SensorEntity):
     @property
     def extra_state_attributes(self) -> dict:
         return self._kind.attrs(self._svc) if self._svc else {}
+
+
+class TechemModelSensor(CoordinatorEntity[TechemCoordinator], SensorEntity):
+    """Outputs of the empirical heating model (see README)."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, coordinator: TechemCoordinator, unit: str, kind: ModelKind) -> None:
+        super().__init__(coordinator)
+        self._unit, self._kind = unit, kind
+        self._attr_unique_id = f"{unit}_HEATING_model_{kind.key}"
+        self._attr_name = kind.name
+        if kind.unit == "KWH":
+            self._attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+            self._attr_device_class = SensorDeviceClass.ENERGY
+            self._attr_suggested_display_precision = 0
+        elif kind.unit:
+            self._attr_native_unit_of_measurement = kind.unit
+        else:
+            self._attr_suggested_display_precision = 2
+        if kind.diagnostic:
+            self._attr_entity_category = EntityCategory.DIAGNOSTIC
+        self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, unit)})
+
+    @property
+    def _analysis(self) -> Analysis | None:
+        return self.coordinator.analyses.get(self._unit)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self._analysis is not None and self._analysis.fit is not None
+
+    @property
+    def native_value(self) -> float | None:
+        return self._kind.value(self._analysis) if self._analysis else None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        return self._kind.attrs(self._analysis) if self._analysis else {}
